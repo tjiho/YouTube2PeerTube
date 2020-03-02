@@ -12,61 +12,24 @@ import mimetypes
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 import utils
 
-def get_video_data(channel_id):
-    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channel_id
+def get_video_data(channel_id,peertube_channel):
+    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?user=" + channel_id
     feed = fp.parse(yt_rss_url)
     channel_lang = feed["feed"]["title_detail"]["language"]
-    print(feed["feed"])
     entries = feed["entries"]
-    channels_timestamps = "channels_timestamps.csv"
     # clear any existing queue before start
     queue = []
-    # read contents of channels_timestamps.csv, create list object of contents
-    ct = open(channels_timestamps, "r")
-    ctr = ct.read().split("\n")
-    ct.close()
-    ctr_line = []
-    channel_found = False
-    # check if channel ID is found in channels_timestamps.csv
-    for line in ctr:
-        line_list = line.split(',')
-        if channel_id == line_list[0]:
-            channel_found = True
-            ctr_line = line
-            break
-    if not channel_found:
-        print("new channel added to config: " + channel_id)
-    print(channel_id)
-    # iterate through video entries for channel, parse data into objects for use
-    for pos, i in enumerate(reversed(entries)):
-        published = i["published"]
-        updated = i["updated"]
-        if not channel_found:
-            # add the video to the queue
-            queue.append(i)
-            ctr_line = str(channel_id + "," + published + "," + updated + '\n')
-            # add the new line to ctr for adding to channels_timestamps later
-            ctr.append(ctr_line)
-            channel_found = True
-        # if the channel exists in channels_timestamps, update "published" time in the channel line
-        else:
-            published_int = utils.convert_timestamp(published)
-            ctr_line_list = ctr_line.split(",")
-            line_published_int = utils.convert_timestamp(ctr_line_list[1])
-            if published_int > line_published_int:
-                # update the timestamp in the line for the channel in channels_timestamps,
-                ctr.remove(ctr_line)
-                ctr_line = str(channel_id + "," + published + "," + updated + '\n')
-                ctr.append(ctr_line)
-                # and add current videos to queue.
+    
+    peertube_videos_url = "https://tube.fede.re"+"/api/v1/video-channels/"+peertube_channel+"/videos"
+
+    peertube_videos = requests.get(peertube_videos_url)
+    if peertube_videos.status_code == 200:
+        for pos, i in enumerate(reversed(entries)):
+            same_videos = [True for peertube_video in peertube_videos.json()['data'] if i['title'] == peertube_video['name'] ]
+            if not same_videos:
+                print(i['title'] + " add to queue")
                 queue.append(i)
-        print(published)
-    # write the new channels and timestamps line to channels_timestamps.csv
-    ct = open(channels_timestamps, "w")
-    for line in ctr:
-        if line != '':
-            ct.write(line + "\n")
-    ct.close()
+    # read contents of channels_timestamps.csv, create list object of contents
     return queue, channel_lang
 
 def download_yt_video(queue_item, dl_dir, channel_conf):
@@ -148,60 +111,19 @@ def get_file(file_path):
 
 
 def handle_peertube_result(request_result):
+    #sleep(1000)
     if request_result.status_code < 300:
         return True
     else:
         print(request_result)
         return False
     
-def upload_to_pt(dl_dir, channel_conf, queue_item, access_token, thumb_extension):
-    # Adapted from Prismedia https://git.lecygnenoir.info/LecygneNoir/prismedia
-    pt_api = channel_conf["peertube_instance"] + "/api/v1"
-    video_file = dl_dir + channel_conf["name"] + "/" + queue_item["yt_videoid"] + "." + \
-                 channel_conf["preferred_extension"]
-    thumb_file = dl_dir + channel_conf["name"] + "/" + queue_item["yt_videoid"] + "." + thumb_extension
-    description = channel_conf["description_prefix"] + "\n\n" + queue_item["summary"] + "\n\n" + channel_conf["description_suffix"]
-    channel_id = str(get_pt_channel_id(channel_conf))
-    # We need to transform fields into tuple to deal with tags as
-    # MultipartEncoder does not support list refer
-    # https://github.com/requests/toolbelt/issues/190 and
-    # https://github.com/requests/toolbelt/issues/205
-    fields = [
-        ("name", queue_item["title"]),
-        ("licence", "1"),
-        ("description", description),
-        ("nsfw", channel_conf["nsfw"]),
-        ("channelId", channel_id),
-        ("originallyPublishedAt", queue_item["published"]),
-        ("category", channel_conf["pt_channel_category"]),
-        ("language", channel_conf["default_lang"]),
-        ("privacy", str(channel_conf["pt_privacy"])),
-        ("commentsEnabled", channel_conf["comments_enabled"]),
-        ("videofile", get_file(video_file)),
-        ("thumbnailfile", get_file(thumb_file)),
-        ("previewfile", get_file(thumb_file)),
-        ("waitTranscoding", 'false')
-    ]
-
-    if channel_conf["pt_tags"] != "":
-        fields.append(("tags", "[" + channel_conf["pt_tags"] + "]"))
-    else:
-        print("you have no tags in your configuration file for this channel")
-    multipart_data = MultipartEncoder(fields)
-    headers = {
-        'Content-Type': multipart_data.content_type,
-        'Authorization': "Bearer " + access_token
-    }
-    
-    return handle_peertube_result(requests.post(pt_api + "/videos/upload", data=multipart_data, headers=headers))
-
-def pt_http_import(dl_dir, channel_conf, queue_item, access_token, thumb_extension, yt_lang):
+def pt_http_import(channel_conf, queue_item, access_token,yt_lang):
     # Adapted from Prismedia https://git.lecygnenoir.info/LecygneNoir/prismedia
     pt_api = channel_conf["peertube_instance"] + "/api/v1"
     yt_video_url = queue_item["link"]
     # TODO: use the alternate link if video not found error occurs
     alternate_link = queue_item["links"][0]["href"]
-    thumb_file = dl_dir + channel_conf["name"] + "/" + queue_item["yt_videoid"] + "." + thumb_extension
     description = channel_conf["description_prefix"] + "\n\n" + queue_item["summary"] + "\n\n" + channel_conf["description_suffix"]
     channel_id = str(get_pt_channel_id(channel_conf))
     language = utils.set_pt_lang(yt_lang, channel_conf["default_lang"])
@@ -210,33 +132,33 @@ def pt_http_import(dl_dir, channel_conf, queue_item, access_token, thumb_extensi
     # MultipartEncoder does not support list refer
     # https://github.com/requests/toolbelt/issues/190 and
     # https://github.com/requests/toolbelt/issues/205
-    fields = [
-        ("name", queue_item["title"]),
-        ("licence", "1"),
-        ("description", description),
-        ("nsfw", channel_conf["nsfw"]),
-        ("channelId", channel_id),
-        ("originallyPublishedAt", queue_item["published"]),
-        ("category", category),
-        ("language", language),
-        ("privacy", str(channel_conf["pt_privacy"])),
-        ("commentsEnabled", channel_conf["comments_enabled"]),
-        ("targetUrl", yt_video_url),
-        ("thumbnailfile", get_file(thumb_file)),
-        ("previewfile", get_file(thumb_file)),
-        ("waitTranscoding", 'false')
-    ]
+    fields = {
+            "name":queue_item["title"],
+            "licence":"1",
+        "description":description,
+        "nsfw":channel_conf["nsfw"],
+        "channelId":channel_id,
+        "originallyPublishedAt":queue_item["published"],
+        "category":category,
+        "privacy":"1",
+        "language":language,
+        "commentsEnabled":channel_conf["comments_enabled"],
+        "targetUrl":yt_video_url,
+        #"thumbnailfile":get_file(thumb_file),
+        #"previewfile":get_file(thumb_file),
+        "waitTranscoding":'false'
+    }
     if channel_conf["pt_tags"] != "":
-        fields.append(("tags[]", channel_conf["pt_tags"]))
+        fields["tags"] = channel_conf["pt_tags"]
     else:
         print("you have no tags in your configuration file for this channel")
-    multipart_data = MultipartEncoder(fields)
+
     headers = {
-        'Content-Type': multipart_data.content_type,
+        'Content-Type': 'application/json',
         'Authorization': "Bearer " + access_token
     }
     
-    return handle_peertube_result(requests.post(pt_api + "/videos/imports", data=multipart_data, headers=headers))
+    return handle_peertube_result(requests.post(pt_api + "/videos/imports", data=json.dumps(fields), headers=headers))
         
 
 def log_upload_error(yt_url,channel_conf):
@@ -250,62 +172,28 @@ def run_steps(conf):
     channel = conf["channel"]
     # run loop for every channel in the configuration file
     global_conf = conf["global"]
-    if conf["global"]["delete_videos"] == "true":
-        delete_videos = True
-    else:
-        delete_videos = False
-    # The following enables the deletion of thumbnails, videos are not downloaded at all
-    if conf["global"]["use_pt_http_import"] == "true":
-        delete_videos = True
-        use_pt_http_import = True
-    else:
-        use_pt_http_import = False
-    dl_dir = global_conf["video_download_dir"]
-    if not path.exists(dl_dir):
-        mkdir(dl_dir)
     channel_counter = 0
     for c in channel:
         print("\n")
         channel_id = channel[c]["channel_id"]
         channel_conf = channel[str(channel_counter)]
-        video_data = get_video_data(channel_id)
+        video_data = get_video_data(channel_id,channel[c]["peertube_channel"])
         queue = video_data[0]
         yt_lang = video_data[1]
         if len(queue) > 0:
-            if not path.exists(dl_dir + "/" + channel_conf["name"]):
-                mkdir(dl_dir + "/" + channel_conf["name"])
             # download videos, metadata and thumbnails from youtube
-            for queue_item in queue:
-                if not use_pt_http_import:
-                    print("downloading " + queue_item["yt_videoid"] + " from YouTube...")
-                    download_yt_video(queue_item, dl_dir, channel_conf)
-                    print("done.")
-                # TODO: download closest to config specified resolution instead of best resolution
-                thumb_extension = save_thumbnail(queue_item, dl_dir, channel_conf)
-                # only save metadata to text file if archiving videos
-                if not delete_videos:
-                    print("saving video metadata...")
-                    save_metadata(queue_item, dl_dir, channel_conf)
-                    print("done.")
             access_token = get_pt_auth(channel_conf)
             # upload videos, metadata and thumbnails to peertube
             for queue_item in queue:
-                if not use_pt_http_import:
-                    print("uploading " + queue_item["yt_videoid"] + " to Peertube...")
-                    pt_result = upload_to_pt(dl_dir, channel_conf, queue_item, access_token, thumb_extension)
-                
-                else:
-                    print("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
-                    pt_result = pt_http_import(dl_dir, channel_conf, queue_item, access_token, thumb_extension, yt_lang)
-
+                print("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
+                pt_result = pt_http_import(channel_conf, queue_item, access_token, yt_lang)
+                print("waiting...")
+                sleep(3)
                 if pt_result:
                     print("done !")
                 else:
                     log_upload_error(queue_item["link"],channel_conf)
-            if delete_videos:
-                print("deleting videos and/or thumbnails...")
-                rmtree(dl_dir + "/" + channel_conf["name"], ignore_errors=True)
-                print("done")
+
         channel_counter += 1
 
 def run(run_once=True):
