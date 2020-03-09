@@ -44,16 +44,14 @@ stream_handler.setLevel(logging.DEBUG)
 stream_handler.setFormatter(stream_formatter)
 logger.addHandler(stream_handler)
 
-
-def get_video_data(channel_id,peertube_channel,peertube_instance_url):
-    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?user=" + channel_id
+def get_video_data(channel_id,peertube_channel,peertube_instance_url,yt_rss_url):
     feed = fp.parse(yt_rss_url)
     channel_lang = feed["feed"]["title_detail"]["language"]
     entries = feed["entries"]
-    # clear any existing queue before start
-    queue = []
     
-    peertube_videos_url = peertube_instance_url+"/api/v1/video-channels/"+peertube_channel+"/videos"
+    queue = [] #initWithYoutubeApi(channel_id)
+    
+    peertube_videos_url = peertube_instance_url+"/api/v1/video-channels/"+peertube_channel+"/videos?count=20"
     logger.info("Fetching peertube videos from channel %s ...",peertube_channel)
     peertube_videos = requests.get(peertube_videos_url)
 
@@ -68,24 +66,8 @@ def get_video_data(channel_id,peertube_channel,peertube_instance_url):
     
     if not queue:
         logger.info("all videos already exist in channel %s",peertube_channel)
-    # read contents of channels_timestamps.csv, create list object of contents
+    
     return queue, channel_lang
-
-def save_metadata(queue_item, dl_dir, channel_conf):
-    dl_dir = dl_dir + channel_conf["name"]
-    link = queue_item["link"]
-    title = queue_item["title"]
-    description = queue_item["summary"]
-    author = queue_item["author"]
-    published = queue_item["published"]
-    metadata_file = dl_dir + "/" + queue_item["yt_videoid"] + ".txt"
-    metadata = open(metadata_file, "w+")
-    # save relevant metadata as semicolon separated easy to read values to text file
-    metadata.write('title: "' + title + '";\n\nlink: "' + link + '";\n\nauthor: "' + author + '";\n\npublished: "' +
-                   published + '";\n\ndescription: "' + description + '"\n\n;')
-    # save raw metadata JSON string
-    metadata.write(str(queue_item))
-    metadata.close()
 
 def get_pt_auth(channel_conf):
     # get variables from channel_conf
@@ -121,9 +103,7 @@ def get_file(file_path):
     return (path.basename(file_path), open(path.abspath(file_path), 'rb'),
             mimetypes.types_map[path.splitext(file_path)[1]])
 
-
 def handle_peertube_result(request_result):
-    #sleep(1000)
     if request_result.status_code < 300:
         return True
     else:
@@ -168,18 +148,49 @@ def pt_http_import(channel_conf, queue_item, access_token,yt_lang):
     return handle_peertube_result(requests.post(pt_api + "/videos/imports", data=json.dumps(fields), headers=headers))
         
 
+def run_steps_channel(conf):
+    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?channel=" + conf["yt_id"]
+    queue,yt_lang = get_video_data(conf["yt_id"],conf["peertube_channel"],conf["peertube_instance"],yt_rss_url)
+    if len(queue) > 0:
+        access_token = get_pt_auth(conf)
+        for queue_item in queue:
+            logger.info("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
+            pt_result = pt_http_import(conf, queue_item, access_token, yt_lang)
+
+def run_steps_user(conf):
+    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?user=" + conf["yt_id"]
+    queue,yt_lang = get_video_data(conf["yt_id"],conf["peertube_channel"],conf["peertube_instance"],yt_rss_url)
+    if len(queue) > 0:
+        access_token = get_pt_auth(conf)
+        for queue_item in queue:
+            logger.info("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
+            pt_result = pt_http_import(conf, queue_item, access_token, yt_lang)
+
+
+def run_steps_playlist(conf):
+    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?playlist_id=" + conf["yt_id"]
+    queue,yt_lang = get_video_data(conf["yt_id"],conf["peertube_channel"],conf["peertube_instance"],yt_rss_url)
+    if len(queue) > 0:
+        access_token = get_pt_auth(conf)
+        for queue_item in queue:
+            logger.info("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
+            pt_result = pt_http_import(conf, queue_item, access_token, yt_lang)
+
 def run_steps(conf):
-    channel = conf["channel"]
+    channels = conf["channel"]
+    playlists = conf["playlist"]
+    users = conf["user"]
     global_conf = conf["global"]
+    
     # run loop for every channel in the configuration file
-    for c in channel:
-        channel_conf = channel[c]
-        queue,yt_lang = get_video_data(channel_conf["channel_id"],channel_conf["peertube_channel"],channel_conf["peertube_instance"])
-        if len(queue) > 0:
-            access_token = get_pt_auth(channel_conf)
-            for queue_item in queue:
-                logger.info("mirroring " + queue_item["link"] + " to Peertube using HTTP import...")
-                pt_result = pt_http_import(channel_conf, queue_item, access_token, yt_lang)
+    for c in channels:
+        run_steps_channel(channels[c])
+
+    for u in users:
+        run_steps_user(users[u])
+    
+    for p in playlists:
+        run_steps_playlist(playlistis[p])
 
 def run(run_once=True):
     #TODO: turn this into a daemon
@@ -190,7 +201,7 @@ def run(run_once=True):
         while True:
             poll_frequency = int(conf["global"]["poll_frequency"]) * 60
             run_steps(conf)
-            print("all jobs done... sleeping")
+            logger.info("all jobs done... sleeping {%s} seconds",poll_frequency)
             sleep(poll_frequency)
 
 if __name__ == "__main__":
