@@ -4,9 +4,8 @@
 
 # These are global configuration options, they apply to the bot as a whole and therefore all channels.
 [global]
-video_download_dir = "/home/tjiho/peertube/" # must be absolute path and user writable directory
+video_download_dir = "/path/to/download/directory/" # must be absolute path and user writable directory
 use_pt_http_import = "true" # Peertube supports sending HTTP links to videos instead of downloading and uploading them. Use this option if you do not want to archive videos and have limited bandwidth. Setting this to true negates delete_videos as videos will not be downloaded, and disables transcoding.
-delete_videos = "false" # Delete videos and metadata after upload to peertube, lowercase string
 poll_frequency = 180 # poll frequency in minutes
 
 # For every channel, a new [channel.x] entry must be added in [channel] in sequential numerical order starting at 0
@@ -19,8 +18,8 @@ poll_frequency = 180 # poll frequency in minutes
 [user]
     [user.0]
     name = "" # name of the channel, does not have to match YT or PT channel names
-    yt_id = "LeMonde" # YT channel ID at the end of the url youtube.com/channel/<channel_id>
-    peertube_instance = "https://peertube.com" # URL of peertube instance
+    yt_id = "LeMonde" # YT channel,user, or playlist ID at the end of the url youtube.com/channel/<channel_id>
+    peertube_instance = "https://peertube.url" # URL of peertube instance
     peertube_channel = "lemonde.fr" # peertube channel handle to upload video to
     peertube_username = "bob" # peertube username
     peertube_password = "password" # peertube password WARNING this file needs to be secure
