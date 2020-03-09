@@ -46,6 +46,10 @@ logger.addHandler(stream_handler)
 
 def get_video_data(channel_id,peertube_channel,peertube_instance_url,yt_rss_url):
     feed = fp.parse(yt_rss_url)
+    if not feed["feed"]:
+        logger.warning("feed for %s is empty",peertube_channel)
+        return [],None
+
     channel_lang = feed["feed"]["title_detail"]["language"]
     entries = feed["entries"]
     
@@ -149,7 +153,7 @@ def pt_http_import(channel_conf, queue_item, access_token,yt_lang):
         
 
 def run_steps_channel(conf):
-    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?channel=" + conf["yt_id"]
+    yt_rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + conf["yt_id"]
     queue,yt_lang = get_video_data(conf["yt_id"],conf["peertube_channel"],conf["peertube_instance"],yt_rss_url)
     if len(queue) > 0:
         access_token = get_pt_auth(conf)

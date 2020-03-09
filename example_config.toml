@@ -12,19 +12,50 @@ poll_frequency = 180 # poll frequency in minutes
 # If you do not wish to append tags or descriptions then leave the quotes empty for those fields.
 # All other fields must have values.
 [channel]
+    [channel.0]
+    name = "" # name of the channel, does not have to match YT or PT channel names
+    yt_id = "Uazertyuiop" # YT channel,user, or playlist ID at the end of the url youtube.com/channel/<channel_id>
+    peertube_instance = "https://peertube.url" # URL of peertube instance
+    peertube_channel = "channelname" # peertube channel handle to upload video to
+    peertube_username = "bob" # peertube username
+    peertube_password = "password" # peertube password WARNING this file needs to be secure
+    pt_channel_category = "news" # category of channel contents. see pt_languages_categories.txt for categories
+    pt_tags = [""] # tags to be added to uploaded video in Peertube, comma separated, max 5, between 2 and 30 char each
+    default_lang = "french" # default language if YT channel does not have a language, see pt_languages.txt for available languages
+    nsfw = "false" # lowercase string, is this channel NSFW?
+    comments_enabled = "true" # lowercase string, do you want comments enabled in this channel?
+    pt_privacy = 1 # 1 = public, 2 = unlisted, 3 = private, privacy for entire channel, default public
+    description_prefix = "" # This description will be added to the beginning of the YT description
+    description_suffix = "" # This description will be appended to the end of the YT description
+
 
 [playlist]
+    [playlist.0]
+    name = "" # name of the channel, does not have to match YT or PT channel names
+    yt_id = "Pazertyuiop" # YT channel,user, or playlist ID at the end of the url youtube.com/channel/<channel_id>
+    peertube_instance = "https://peertube.url" # URL of peertube instance
+    peertube_channel = "channelname" # peertube channel handle to upload video to
+    peertube_username = "bob" # peertube username
+    peertube_password = "password" # peertube password WARNING this file needs to be secure
+    pt_channel_category = "news" # category of channel contents. see pt_languages_categories.txt for categories
+    pt_tags = [""] # tags to be added to uploaded video in Peertube, comma separated, max 5, between 2 and 30 char each
+    default_lang = "french" # default language if YT channel does not have a language, see pt_languages.txt for available languages
+    nsfw = "false" # lowercase string, is this channel NSFW?
+    comments_enabled = "true" # lowercase string, do you want comments enabled in this channel?
+    pt_privacy = 1 # 1 = public, 2 = unlisted, 3 = private, privacy for entire channel, default public
+    description_prefix = "" # This description will be added to the beginning of the YT description
+    description_suffix = "" # This description will be appended to the end of the YT description
 
 [user]
     [user.0]
     name = "" # name of the channel, does not have to match YT or PT channel names
-    yt_id = "LeMonde" # YT channel,user, or playlist ID at the end of the url youtube.com/channel/<channel_id>
+    yt_id = "Some_name" # YT channel,user, or playlist ID at the end of the url youtube.com/channel/<channel_id>
     peertube_instance = "https://peertube.url" # URL of peertube instance
-    peertube_channel = "lemonde.fr" # peertube channel handle to upload video to
+    peertube_channel = "channelname" # peertube channel handle to upload video to
     peertube_username = "bob" # peertube username
     peertube_password = "password" # peertube password WARNING this file needs to be secure
     pt_channel_category = "news" # category of channel contents. see pt_languages_categories.txt for categories
-    pt_tags = ["lemonde.fr","journalisme"] # tags to be added to uploaded video in Peertube, comma separated, max 5, between 2 and 30 char each
+    pt_tags = [""] # tags to be added to uploaded video in Peertube, comma separated, max 5, between 2 and 30 char each
     default_lang = "french" # default language if YT channel does not have a language, see pt_languages.txt for available languages
     nsfw = "false" # lowercase string, is this channel NSFW?
     comments_enabled = "true" # lowercase string, do you want comments enabled in this channel?
