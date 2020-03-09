@@ -190,7 +190,7 @@ def run_steps(conf):
         run_steps_user(users[u])
     
     for p in playlists:
-        run_steps_playlist(playlistis[p])
+        run_steps_playlist(playlists[p])
 
 def run(run_once=True):
     #TODO: turn this into a daemon
